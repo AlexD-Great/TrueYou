@@ -1,0 +1,11 @@
+.cards-container {
+  display: flex;
+  gap: 64px;
+  margin: 2rem;
+  flex-wrap: wrap;
+}
+
+.card_border {
+  border: #ddd dashed 1px;
+  padding: 80px 80px;
+}

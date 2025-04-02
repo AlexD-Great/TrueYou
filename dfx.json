@@ -1,0 +1,45 @@
+{
+  "canisters": {
+    "decentra_verify_m_backend": {
+      "main": "src/decentra_verify_m_backend/main.mo",
+      "type": "motoko"
+    },
+    "decentra_verify_m_frontend": {
+      "dependencies": ["decentra_verify_m_backend"],
+      "source": ["src/decentra_verify_m_frontend/dist"],
+      "type": "assets",
+      "workspace": "decentra_verify_m_frontend"
+    },
+    "internet_identity": {
+      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
+      "type": "custom",
+      "specified_id": "rdmx6-jaaaa-aaaaa-aaadq-cai",
+      "remote": {
+        "id": {
+          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        }
+      },
+      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz"
+    },
+    "evm_rpc": {
+      "candid": "https://github.com/dfinity/evm-rpc-canister/releases/latest/download/evm_rpc.did",
+      "type": "custom",
+      "specified_id": "7hfb6-caaaa-aaaar-qadga-cai",
+      "remote": {
+        "id": {
+          "ic": "7hfb6-caaaa-aaaar-qadga-cai"
+        }
+      },
+      "wasm": "https://github.com/dfinity/evm-rpc-canister/releases/latest/download/evm_rpc.wasm.gz",
+      "init_arg": "(record {})"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": "mops sources"
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
