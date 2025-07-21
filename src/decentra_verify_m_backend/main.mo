@@ -147,6 +147,28 @@ persistent actor Filevault {
     isActive: Bool;
   };
 
+  // Define pooled verification request status
+  type PooledRequestStatus = {
+    #unverified;
+    #claimed;
+    #verified;
+    #rejected;
+  };
+
+  // Define pooled verification request
+  type PooledVerificationRequest = {
+    id: Text;
+    submitter: Principal;
+    credentialName: Text;
+    requestMessage: Text;
+    status: PooledRequestStatus;
+    submittedAt: Int;
+    claimedBy: ?Principal;
+    claimedAt: ?Int;
+    processedAt: ?Int;
+    verifierResponse: ?Text;
+  };
+
   // HashMap to store the user data
   private var files = HashMap.new<Principal, UserFiles>();
 
@@ -164,6 +186,10 @@ persistent actor Filevault {
   // Admin role management
   private var userRoles = HashMap.new<Principal, AdminConfig>();
   private var superAdmins = HashMap.new<Principal, Bool>();
+
+  // Storage for pooled verification requests
+  private var pooledVerificationRequests = HashMap.new<Text, PooledVerificationRequest>();
+  private stable var nextPooledRequestId : Nat = 1;
 
 
   // Return files associated with a user's principal.
@@ -408,6 +434,212 @@ persistent actor Filevault {
         };
       })
     );
+  };
+
+  // ==== POOLED VERIFICATION FUNCTIONS ====
+
+  // Submit a credential for verification to the pool
+  public shared (msg) func submitVerificationRequest(credentialName: Text, requestMessage: Text) : async Text {
+    // Check if user has the credential file
+    let userFiles = getUserFiles(msg.caller);
+    switch (HashMap.get(userFiles, thash, credentialName)) {
+      case null {
+        // Return error - credential doesn't exist
+        "ERROR: Credential not found";
+      };
+      case (?_file) {
+        // Generate unique request ID
+        let requestId = "pool_req_" # Nat.toText(nextPooledRequestId);
+        nextPooledRequestId += 1;
+
+        let newRequest : PooledVerificationRequest = {
+          id = requestId;
+          submitter = msg.caller;
+          credentialName = credentialName;
+          requestMessage = requestMessage;
+          status = #unverified;
+          submittedAt = Time.now();
+          claimedBy = null;
+          claimedAt = null;
+          processedAt = null;
+          verifierResponse = null;
+        };
+
+        let _ = HashMap.put(pooledVerificationRequests, thash, requestId, newRequest);
+        
+        // Debug: Check if the request was actually stored
+        switch (HashMap.get(pooledVerificationRequests, thash, requestId)) {
+          case null {
+            "ERROR: Failed to store request";
+          };
+          case (?stored) {
+            requestId;
+          };
+        };
+      };
+    };
+  };
+
+  // Get user's submitted verification requests
+  public shared (msg) func getUserSubmittedRequests() : async [PooledVerificationRequest] {
+    let requests = HashMap.vals(pooledVerificationRequests);
+    
+    Iter.toArray(
+      Iter.filter(requests, func(req : PooledVerificationRequest) : Bool {
+        req.submitter == msg.caller;
+      })
+    );
+  };
+
+  // Get verification pool for verifiers/reviewers (only unverified and claimed by them)
+  public shared (msg) func getVerificationPool() : async [PooledVerificationRequest] {
+    // For now, allow access to all authenticated users
+    // TODO: Implement proper permission checking without blocking async calls
+
+    let requests = HashMap.vals(pooledVerificationRequests);
+    
+    Iter.toArray(
+      Iter.filter(requests, func(req : PooledVerificationRequest) : Bool {
+        switch (req.status) {
+          case (#unverified) true;
+          case (#claimed) {
+            switch (req.claimedBy) {
+              case (?claimer) claimer == msg.caller;
+              case null false;
+            };
+          };
+          case (_) false;
+        };
+      })
+    );
+  };
+
+  // Claim a verification request from the pool
+  public shared (msg) func claimVerificationRequest(requestId: Text) : async Bool {
+    // Check if user is a verifier or reviewer or admin
+    let isVerifier = await isCurrentUserVerifier();
+    let isReviewer = await isCurrentUserReviewer();
+    let isAdmin = await isCurrentUserAdmin();
+    let hasPermission = isVerifier or isReviewer or isAdmin;
+    
+    if (not hasPermission) {
+      return false;
+    };
+
+    switch (HashMap.get(pooledVerificationRequests, thash, requestId)) {
+      case null false;
+      case (?request) {
+        if (request.status == #unverified) {
+          let updatedRequest = {
+            request with
+            status = #claimed;
+            claimedBy = ?msg.caller;
+            claimedAt = ?Time.now();
+          };
+          let _ = HashMap.put(pooledVerificationRequests, thash, requestId, updatedRequest);
+          true;
+        } else {
+          false;
+        };
+      };
+    };
+  };
+
+  // Process (approve/reject) a claimed verification request
+  public shared (msg) func processVerificationRequest(requestId: Text, approved: Bool, verifierResponse: Text) : async Bool {
+    // Check if user is a verifier or reviewer or admin
+    let isVerifier = await isCurrentUserVerifier();
+    let isReviewer = await isCurrentUserReviewer();
+    let isAdmin = await isCurrentUserAdmin();
+    let hasPermission = isVerifier or isReviewer or isAdmin;
+    
+    if (not hasPermission) {
+      return false;
+    };
+
+    switch (HashMap.get(pooledVerificationRequests, thash, requestId)) {
+      case null false;
+      case (?request) {
+        // Check if this verifier claimed the request
+        switch (request.claimedBy) {
+          case (?claimer) {
+            if (claimer == msg.caller and request.status == #claimed) {
+              let newStatus = if (approved) #verified else #rejected;
+              let updatedRequest = {
+                request with
+                status = newStatus;
+                processedAt = ?Time.now();
+                verifierResponse = ?verifierResponse;
+              };
+              let _ = HashMap.put(pooledVerificationRequests, thash, requestId, updatedRequest);
+              true;
+            } else {
+              false;
+            };
+          };
+          case null false;
+        };
+      };
+    };
+  };
+
+  // Get all processed verification requests (for admin reporting)
+  public shared (msg) func getAllProcessedRequests() : async [PooledVerificationRequest] {
+    // Check if user is admin
+    let isAdmin = await isCurrentUserAdmin();
+    
+    if (not isAdmin) {
+      return [];
+    };
+
+    let requests = HashMap.vals(pooledVerificationRequests);
+    
+    Iter.toArray(
+      Iter.filter(requests, func(req : PooledVerificationRequest) : Bool {
+        switch (req.status) {
+          case (#verified) true;
+          case (#rejected) true;
+          case (_) false;
+        };
+      })
+    );
+  };
+
+  // Debug function to get ALL pooled requests regardless of status (admin only)
+  public shared (msg) func getAllPooledRequestsDebug() : async [PooledVerificationRequest] {
+    // Check if user is admin
+    let isAdmin = await isCurrentUserAdmin();
+    
+    if (not isAdmin) {
+      return [];
+    };
+
+    let requests = HashMap.vals(pooledVerificationRequests);
+    Iter.toArray(requests);
+  };
+
+  // Debug function to get the count of pooled requests
+  public shared (msg) func getPooledRequestsCount() : async Nat {
+    // Check if user is admin
+    let isAdmin = await isCurrentUserAdmin();
+    
+    if (not isAdmin) {
+      return 0;
+    };
+
+    HashMap.size(pooledVerificationRequests);
+  };
+
+  // Debug function to get next request ID
+  public shared (msg) func getNextRequestId() : async Nat {
+    // Check if user is admin
+    let isAdmin = await isCurrentUserAdmin();
+    
+    if (not isAdmin) {
+      return 0;
+    };
+
+    nextPooledRequestId;
   };
 
   // Helper function to generate NFT metadata signature

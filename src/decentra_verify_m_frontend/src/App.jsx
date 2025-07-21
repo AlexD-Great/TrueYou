@@ -305,7 +305,7 @@ function App() {
           <Sidebar 
             currentView={currentView} 
             setCurrentView={setCurrentView}
-            userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
+            onLogout={logout}
           />
           <Header 
             onLogout={logout}

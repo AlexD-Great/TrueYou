@@ -118,8 +118,8 @@ const Dashboard = () => {
           {userPrincipal && (
             <div className="debug-info">
               <small style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>
-                Your Principal ID: {userPrincipal}
-                {userPrincipal === "10000" && (
+                Principal ID: {userPrincipal.slice(0, 12)}...{userPrincipal.slice(-8)}
+                {(userPrincipal === "10000" || userPrincipal === "k2ir2-52b5o-sc6f7-ai4bg-vdrf3-wghtz-xz4us-77lr6-y6cfv-5qlvy-sqe") && (
                   <span style={{ color: 'var(--success-color)', fontWeight: '600' }}> (Super Admin)</span>
                 )}
               </small>
