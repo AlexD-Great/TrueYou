@@ -76,6 +76,19 @@ const Sidebar = ({ currentView, setCurrentView, onLogout }) => {
         </svg>
       )
     },
+    {
+      id: "nfts",
+      label: "My NFTs",
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+          <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2"/>
+          <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2"/>
+          <path d="M7 7h10v6H7z" stroke="currentColor" strokeWidth="2" fill="none"/>
+          <circle cx="12" cy="10" r="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+        </svg>
+      )
+    },
     // Conditionally include Verification Requests only for verifiers/reviewers/admins
     ...(isVerifier ? [{
       id: "verification-requests",
@@ -159,6 +172,7 @@ const Sidebar = ({ currentView, setCurrentView, onLogout }) => {
   ];
 
   const handleItemClick = (itemId) => {
+    console.log("handleItemClick", itemId);
     setCurrentView(itemId);
   };
 

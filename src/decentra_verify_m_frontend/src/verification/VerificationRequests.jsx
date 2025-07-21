@@ -13,7 +13,17 @@ const VerificationRequests = () => {
   const [activeRequestId, setActiveRequestId] = useState(null);
   const [isVerifier, setIsVerifier] = useState(false);
   const [fileViewProgress, setFileViewProgress] = useState(null);
-  const [fileModal, setFileModal] = useState({ isOpen: false, fileUrl: null, fileName: null, fileType: null, isFullPage: false, zoomLevel: 1 });
+  const [fileModal, setFileModal] = useState({ 
+    isOpen: false, 
+    fileUrl: null, 
+    fileName: null, 
+    fileType: null, 
+    isFullPage: false, 
+    zoomLevel: 1,
+    width: 800,
+    height: 600,
+    isResizing: false
+  });
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -254,7 +264,17 @@ const VerificationRequests = () => {
     if (fileModal.fileUrl) {
       URL.revokeObjectURL(fileModal.fileUrl);
     }
-    setFileModal({ isOpen: false, fileUrl: null, fileName: null, fileType: null, isFullPage: false, zoomLevel: 1 });
+    setFileModal({ 
+      isOpen: false, 
+      fileUrl: null, 
+      fileName: null, 
+      fileType: null, 
+      isFullPage: false, 
+      zoomLevel: 1,
+      width: 800,
+      height: 600,
+      isResizing: false
+    });
   };
 
   const toggleFullPage = () => {
@@ -272,6 +292,36 @@ const VerificationRequests = () => {
 
   const resetZoom = () => {
     setFileModal(prev => ({ ...prev, zoomLevel: 1 }));
+  };
+
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    setFileModal(prev => ({ ...prev, isResizing: true }));
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = fileModal.width;
+    const startHeight = fileModal.height;
+
+    const handleMouseMove = (e) => {
+      const newWidth = Math.max(400, startWidth + (e.clientX - startX));
+      const newHeight = Math.max(300, startHeight + (e.clientY - startY));
+      
+      setFileModal(prev => ({
+        ...prev,
+        width: Math.min(newWidth, window.innerWidth - 40),
+        height: Math.min(newHeight, window.innerHeight - 40)
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setFileModal(prev => ({ ...prev, isResizing: false }));
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   const renderFilePreview = () => {
@@ -621,16 +671,18 @@ const VerificationRequests = () => {
             id="file-modal"
             style={{
               backgroundColor: 'var(--bg-primary)',
-              borderRadius: fileModal.isFullscreen ? '0' : '12px',
-              maxWidth: fileModal.isFullscreen ? '100vw' : '90vw',
-              maxHeight: fileModal.isFullscreen ? '100vh' : '90vh',
-              width: fileModal.isFullscreen ? '100vw' : 'auto',
-              height: fileModal.isFullscreen ? '100vh' : 'auto',
+              borderRadius: fileModal.isFullPage ? '0' : '12px',
+              maxWidth: fileModal.isFullPage ? '100vw' : '90vw',
+              maxHeight: fileModal.isFullPage ? '100vh' : '90vh',
+              width: fileModal.isFullPage ? '100vw' : `${fileModal.width}px`,
+              height: fileModal.isFullPage ? '100vh' : `${fileModal.height}px`,
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              border: fileModal.isFullscreen ? 'none' : '1px solid var(--border-color)',
-              boxShadow: fileModal.isFullscreen ? 'none' : '0 20px 60px rgba(0, 0, 0, 0.3)'
+              border: fileModal.isFullPage ? 'none' : '1px solid var(--border-color)',
+              boxShadow: fileModal.isFullPage ? 'none' : '0 20px 60px rgba(0, 0, 0, 0.3)',
+              position: 'relative',
+              cursor: fileModal.isResizing ? 'nw-resize' : 'default'
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -708,9 +760,9 @@ const VerificationRequests = () => {
                   )}
                 </div>
 
-                {/* Fullscreen Toggle */}
+                {/* Full Page Toggle */}
                 <button
-                  onClick={toggleFullscreen}
+                  onClick={toggleFullPage}
                   className="btn btn-secondary"
                   style={{ 
                     fontSize: '0.8rem', 
@@ -719,9 +771,9 @@ const VerificationRequests = () => {
                     alignItems: 'center',
                     gap: '4px'
                   }}
-                  title={fileModal.isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                  title={fileModal.isFullPage ? "Exit Full Page" : "Enter Full Page"}
                 >
-                  {fileModal.isFullscreen ? "⛶" : "⛶"} {fileModal.isFullscreen ? "Exit" : "Fullscreen"}
+                  {fileModal.isFullPage ? "⛶" : "⛶"} {fileModal.isFullPage ? "Exit" : "Full Page"}
                 </button>
 
                 {/* Close */}
@@ -755,6 +807,27 @@ const VerificationRequests = () => {
             >
               {renderFilePreview()}
             </div>
+            
+            {/* Resize Handle */}
+            {!fileModal.isFullPage && (
+              <div
+                onMouseDown={handleResizeStart}
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  width: '20px',
+                  height: '20px',
+                  cursor: 'nw-resize',
+                  background: 'linear-gradient(-45deg, transparent 0%, transparent 30%, var(--border-color) 30%, var(--border-color) 35%, transparent 35%, transparent 65%, var(--border-color) 65%, var(--border-color) 70%, transparent 70%)',
+                  opacity: 0.6,
+                  transition: 'opacity 0.2s ease'
+                }}
+                onMouseEnter={(e) => e.target.style.opacity = '1'}
+                onMouseLeave={(e) => e.target.style.opacity = '0.6'}
+                title="Drag to resize"
+              />
+            )}
           </div>
         </div>
       )}
