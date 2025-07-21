@@ -216,7 +216,6 @@ const RequestVerification = () => {
               const formatTimestamp = (timestamp) => {
                 return new Date(Number(timestamp) / 1000000).toLocaleDateString();
               };
-              console.log('request', request)
               
               return (
                 <div key={index} className="request-card">
@@ -226,7 +225,7 @@ const RequestVerification = () => {
                       <p>Status: {statusString.charAt(0).toUpperCase() + statusString.slice(1)}</p>
                       <p>Submitted: {formatTimestamp(request.submittedAt)}</p>
                       {request.claimedBy && request.claimedBy.length > 0 && (
-                        <p>Claimed by: {typeof request.claimedBy === 'string' ? request.claimedBy.slice(0, 12) : request.claimedBy.toText().slice(0, 12)}...</p>
+                        <p>Claimed by: {typeof request.claimedBy === 'string' ? request.claimedBy.slice(0, 12) : (request.claimedBy.toText ? request.claimedBy.toText().slice(0, 12) : String(request.claimedBy).slice(0, 12))}...</p>
                       )}
                     </div>
                     <span className={`status-badge status-${statusString}`}>

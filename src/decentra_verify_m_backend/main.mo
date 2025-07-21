@@ -516,11 +516,11 @@ persistent actor Filevault {
 
   // Claim a verification request from the pool
   public shared (msg) func claimVerificationRequest(requestId: Text) : async Bool {
-    // Check if user is a verifier or reviewer or admin
-    let isVerifier = await isCurrentUserVerifier();
-    let isReviewer = await isCurrentUserReviewer();
-    let isAdmin = await isCurrentUserAdmin();
-    let hasPermission = isVerifier or isReviewer or isAdmin;
+    // Check if user is a verifier or reviewer or admin - use direct helper functions
+    let userIsVerifier = isVerifier(msg.caller);
+    let userIsReviewer = isReviewer(msg.caller);
+    let userIsAdmin = isAdmin(msg.caller);
+    let hasPermission = userIsVerifier or userIsReviewer or userIsAdmin;
     
     if (not hasPermission) {
       return false;
@@ -545,13 +545,59 @@ persistent actor Filevault {
     };
   };
 
+  // Debug function to claim a verification request with detailed logging
+  public shared (msg) func debugClaimVerificationRequest(requestId: Text) : async Text {
+    // Check permissions step by step - use direct helper functions
+    let userIsVerifier = isVerifier(msg.caller);
+    let userIsReviewer = isReviewer(msg.caller);
+    let userIsAdmin = isAdmin(msg.caller);
+    let hasPermission = userIsVerifier or userIsReviewer or userIsAdmin;
+    
+    let result = "Caller: " # Principal.toText(msg.caller) # 
+                 " | isVerifier: " # (if userIsVerifier "true" else "false") #
+                 " | isReviewer: " # (if userIsReviewer "true" else "false") #
+                 " | isAdmin: " # (if userIsAdmin "true" else "false") #
+                 " | hasPermission: " # (if hasPermission "true" else "false");
+    
+    if (not hasPermission) {
+      return result # " | FAILED: No permission";
+    };
+
+    switch (HashMap.get(pooledVerificationRequests, thash, requestId)) {
+      case null {
+        result # " | FAILED: Request not found";
+      };
+      case (?request) {
+        let statusText = switch (request.status) {
+          case (#unverified) "unverified";
+          case (#claimed) "claimed";  
+          case (#verified) "verified";
+          case (#rejected) "rejected";
+        };
+        
+        if (request.status == #unverified) {
+          let updatedRequest = {
+            request with
+            status = #claimed;
+            claimedBy = ?msg.caller;
+            claimedAt = ?Time.now();
+          };
+          let _ = HashMap.put(pooledVerificationRequests, thash, requestId, updatedRequest);
+          result # " | SUCCESS: Claimed request with status " # statusText;
+        } else {
+          result # " | FAILED: Request status is " # statusText # ", not unverified";
+        };
+      };
+    };
+  };
+
   // Process (approve/reject) a claimed verification request
   public shared (msg) func processVerificationRequest(requestId: Text, approved: Bool, verifierResponse: Text) : async Bool {
-    // Check if user is a verifier or reviewer or admin
-    let isVerifier = await isCurrentUserVerifier();
-    let isReviewer = await isCurrentUserReviewer();
-    let isAdmin = await isCurrentUserAdmin();
-    let hasPermission = isVerifier or isReviewer or isAdmin;
+    // Check if user is a verifier or reviewer or admin - use direct helper functions
+    let userIsVerifier = isVerifier(msg.caller);
+    let userIsReviewer = isReviewer(msg.caller);
+    let userIsAdmin = isAdmin(msg.caller);
+    let hasPermission = userIsVerifier or userIsReviewer or userIsAdmin;
     
     if (not hasPermission) {
       return false;
@@ -905,6 +951,68 @@ persistent actor Filevault {
   // Get current user's principal ID (for debugging/verification)
   public shared (msg) func getCurrentUserPrincipal() : async Text {
     Principal.toText(msg.caller);
+  };
+
+  // Get file chunks for verification (verifiers/admins only)
+  public shared (msg) func getFileChunkForVerification(submitterPrincipal: Principal, credentialName: Text, chunkIndex: Nat) : async ?Blob {
+    // Check if user is a verifier, reviewer, or admin
+    let userIsVerifier = isVerifier(msg.caller);
+    let userIsReviewer = isReviewer(msg.caller);
+    let userIsAdmin = isAdmin(msg.caller);
+    let hasPermission = userIsVerifier or userIsReviewer or userIsAdmin;
+    
+    if (not hasPermission) {
+      return null;
+    };
+
+    // Get the submitter's files
+    switch (HashMap.get(files, phash, submitterPrincipal)) {
+      case null null;
+      case (?submitterFiles) {
+        switch (HashMap.get(submitterFiles, thash, credentialName)) {
+          case null null;
+          case (?file) {
+            switch (Array.find(file.chunks, func(chunk : FileChunk) : Bool { chunk.index == chunkIndex })) {
+              case null null;
+              case (?foundChunk) ?foundChunk.chunk;
+            };
+          };
+        };
+      };
+    };
+  };
+
+  // Get file metadata for verification (verifiers/admins only)
+  public shared (msg) func getFileMetadataForVerification(submitterPrincipal: Principal, credentialName: Text) : async ?{ name: Text; size: Nat; fileType: Text; totalChunks: Nat; ecdsa_sign: Text; schnorr_sign: Text; } {
+    // Check if user is a verifier, reviewer, or admin
+    let userIsVerifier = isVerifier(msg.caller);
+    let userIsReviewer = isReviewer(msg.caller);
+    let userIsAdmin = isAdmin(msg.caller);
+    let hasPermission = userIsVerifier or userIsReviewer or userIsAdmin;
+    
+    if (not hasPermission) {
+      return null;
+    };
+
+    // Get the submitter's files
+    switch (HashMap.get(files, phash, submitterPrincipal)) {
+      case null null;
+      case (?submitterFiles) {
+        switch (HashMap.get(submitterFiles, thash, credentialName)) {
+          case null null;
+          case (?file) {
+            ?{
+              name = file.name;
+              size = file.totalSize;
+              fileType = file.fileType;
+              totalChunks = file.chunks.size();
+              ecdsa_sign = file.ecdsa_sign;
+              schnorr_sign = file.schnorr_sign;
+            };
+          };
+        };
+      };
+    };
   };
 
   // public func sign_file_with_schnorr(message : [{ name : Text; size : Nat; fileType : Text; ecdsa_sign: Text; schnorr_sign: Text; }]) : async Text {
