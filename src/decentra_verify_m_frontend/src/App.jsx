@@ -2,6 +2,13 @@ import { AuthClient } from "@dfinity/auth-client";
 import { createActor } from "declarations/decentra_verify_m_backend";
 import { canisterId } from "declarations/decentra_verify_m_backend/index.js";
 import React, { useState, useEffect } from "react";
+import { ThemeProvider } from "./context/ThemeContext";
+import { AuthProvider } from "./auth/AuthContext";
+import Dashboard from "./components/Dashboard";
+import Sidebar from "./components/Sidebar";
+import Header from "./components/Header";
+import AdminPanel from "./admin/AdminPanel";
+import "./styles/globals.css";
 import "./index.css";
 
 const network = process.env.DFX_NETWORK;
@@ -17,6 +24,8 @@ function App() {
   const [files, setFiles] = useState([]);
   const [errorMessage, setErrorMessage] = useState();
   const [fileTransferProgress, setFileTransferProgress] = useState();
+  const [currentView, setCurrentView] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     updateActor();
@@ -175,93 +184,140 @@ function App() {
     }
   }
 
-  return (
-    <div className="container mx-auto p-4">
-      <div className="flex flex-row justify-between">
-        <h1 className="mb-4 text-2xl font-bold">FileVault</h1>
+  const handleMenuToggle = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
 
-        {isAuthenticated ? (
-          <button
-            onClick={logout}
-            className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-          >
-            Logout
-          </button>
-        ) : (
-          <button
-            onClick={login}
-            className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-          >
-            Login with Internet Identity
-          </button>
+  const renderMainContent = () => {
+    switch (currentView) {
+      case "dashboard":
+        return <Dashboard />;
+      case "upload":
+        return renderUploadView();
+      case "credentials":
+        return renderCredentialsView();
+      case "nfts":
+        return renderNFTsView();
+      case "admin":
+        return <AdminPanel />;
+      default:
+        return <Dashboard />;
+    }
+  };
+
+  const renderUploadView = () => (
+    <div className="upload-view">
+      <div className="upload-header">
+        <h1>Upload Credential</h1>
+        <p>Upload your credentials for verification and NFT generation</p>
+      </div>
+      <div className="upload-content">
+        <input
+          type="file"
+          onChange={handleFileUpload}
+          className="file-input"
+        />
+        {errorMessage && (
+          <div className="error-message">{errorMessage}</div>
+        )}
+        {fileTransferProgress && (
+          <div className="progress-info">
+            {`${fileTransferProgress.mode} ${fileTransferProgress.fileName} ... ${fileTransferProgress.progress}%`}
+          </div>
         )}
       </div>
-
-      {!isAuthenticated ? (
-        <div className="mt-4 rounded-md border-l-4 bg-neutral-200 p-4 shadow-md">
-          <p className="mt-2 text-black">
-            Please sign in to access the file vault.
-          </p>
-        </div>
-      ) : (
-        <div>
-          <div className="mb-4">
-            <input
-              type="file"
-              onChange={handleFileUpload}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-full file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-            />
-          </div>
-
-          {errorMessage && (
-            <div className="mt-4 rounded-md border border-red-400 bg-red-100 p-3 text-red-700">
-              {errorMessage}
-            </div>
-          )}
-
-          {fileTransferProgress && (
-            <div className="mb-4">
-              <p className="mb-2 text-sm text-gray-600">
-                {`${fileTransferProgress.mode} ${fileTransferProgress.fileName} ... ${fileTransferProgress.progress}%`}
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {files.length === 0 ? (
-              <p className="py-8 text-center text-gray-500">
-                You have no files. Upload some!
-              </p>
-            ) : (
-              files.map((file) => (
-                <div
-                  key={file.name}
-                  className="flex items-center justify-between rounded-lg bg-white p-3 shadow"
-                >
-                  <div className="flex items-center space-x-2">
-                    <span>{file.name}</span>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleFileDownload(file.name)}
-                      className="btn"
-                    >
-                      Download
-                    </button>
-                    <button
-                      onClick={() => handleFileDelete(file.name)}
-                      className="btn"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
     </div>
+  );
+
+  const renderCredentialsView = () => (
+    <div className="credentials-view">
+      <div className="credentials-header">
+        <h1>My Credentials</h1>
+        <p>Manage your uploaded credentials</p>
+      </div>
+      <div className="credentials-content">
+        {files.length === 0 ? (
+          <div className="empty-state">
+            <p>No credentials found. Upload your first credential to get started!</p>
+          </div>
+        ) : (
+          <div className="credentials-grid">
+            {files.map((file) => (
+              <div key={file.name} className="credential-card">
+                <div className="credential-info">
+                  <h3>{file.name}</h3>
+                  <p>Size: {file.size} bytes</p>
+                  <p>Type: {file.fileType}</p>
+                </div>
+                <div className="credential-actions">
+                  <button onClick={() => handleFileDownload(file.name)}>
+                    Download
+                  </button>
+                  <button onClick={() => handleFileDelete(file.name)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderNFTsView = () => (
+    <div className="nfts-view">
+      <div className="nfts-header">
+        <h1>My NFTs</h1>
+        <p>View and manage your credential NFTs</p>
+      </div>
+      <div className="nfts-content">
+        <p>NFT functionality coming soon...</p>
+      </div>
+    </div>
+  );
+
+  if (!isAuthenticated) {
+    return (
+      <ThemeProvider>
+        <div className="login-screen">
+          <div className="login-container">
+            <div className="login-card">
+              <div className="logo">
+                <div className="logo-icon">📋</div>
+                <h1>CredVerify</h1>
+              </div>
+              <p>Secure credential verification on the Internet Computer</p>
+              <button onClick={login} className="login-btn">
+                Login with Internet Identity
+              </button>
+            </div>
+          </div>
+        </div>
+      </ThemeProvider>
+    );
+  }
+
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
+          <Sidebar 
+            currentView={currentView} 
+            setCurrentView={setCurrentView}
+            userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
+          />
+          <Header 
+            onLogout={logout}
+            onMenuToggle={handleMenuToggle}
+            userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
+          />
+          <main className="main-content">
+            {renderMainContent()}
+          </main>
+        </div>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

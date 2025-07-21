@@ -1,0 +1,37 @@
+/
+├── Home
+│   ├── About
+│   ├── How It Works
+│   └── FAQ
+│
+├── Dashboard  (requires login)
+│   ├── Upload Credential
+│   │   └── Upload Form
+│   │       └── Upload Success / Pending Review
+│   │
+│   ├── My Credentials
+│   │   ├── Credential Detail Page
+│   │   │   ├── Status: Pending / Verified / Rejected
+│   │   │   ├── Request Verification (button if status == Pending)
+│   │   │   └── Generate NFT (button if status == Verified)
+│   │   └── Upload New Credential
+│   │
+│   ├── My NFTs
+│   │   └── NFT Viewer / Export Options
+│   │
+│   └── Notifications
+│       └── Review Status Updates
+│
+├── Reviewer Panel (admin/reviewer only)
+│   ├── Review Queue
+│   │   └── Credential Detail & Approve/Reject
+│   └── Review History
+│
+├── Profile
+│   ├── Wallet Connection
+│   ├── Edit Profile
+│   └── Settings
+│
+└── Help & Support
+    ├── Contact
+    └── Troubleshooting

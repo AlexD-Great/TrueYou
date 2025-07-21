@@ -2,7 +2,7 @@ import Bool "mo:base/Bool";
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
 import HashMap "mo:map/Map";
-import { phash; thash } "mo:map/Map";
+import { phash; thash; nhash } "mo:map/Map";
 import Iter "mo:base/Iter";
 import Nat "mo:base/Nat";
 import Principal "mo:base/Principal";
@@ -111,6 +111,42 @@ persistent actor Filevault {
     respondedAt: Int;
   };
 
+  // Define NFT metadata structure
+  type NFTMetadata = {
+    name: Text;
+    description: Text;
+    image: Text;
+    attributes: [(Text, Text)];
+    created_at: Int;
+    creator: Principal;
+  };
+
+  // Define NFT structure
+  type NFT = {
+    id: Nat;
+    owner: Principal;
+    metadata: NFTMetadata;
+    signature: Text;
+    minted_at: Int;
+  };
+
+  // Define user roles
+  type UserRole = {
+    #admin;
+    #verifier;
+    #reviewer;
+    #user;
+  };
+
+  // Define admin configuration
+  type AdminConfig = {
+    principal: Principal;
+    role: UserRole;
+    assignedBy: Principal;
+    assignedAt: Int;
+    isActive: Bool;
+  };
+
   // HashMap to store the user data
   private var files = HashMap.new<Principal, UserFiles>();
 
@@ -119,6 +155,16 @@ persistent actor Filevault {
 
   // HashMap to store verification responses
   private var verificationResponses = HashMap.new<Text, VerificationResponse>();
+
+  // Storage for NFTs
+  private var nfts = HashMap.new<Nat, NFT>();
+  private var userNFTs = HashMap.new<Principal, [Nat]>();
+  private var nextNFTId : Nat = 1;
+
+  // Admin role management
+  private var userRoles = HashMap.new<Principal, AdminConfig>();
+  private var superAdmins = HashMap.new<Principal, Bool>();
+
 
   // Return files associated with a user's principal.
   private func getUserFiles(user : Principal) : UserFiles {
@@ -353,7 +399,6 @@ persistent actor Filevault {
   // Get all verification responses for a requester
   public shared (msg) func getVerificationResponses() : async [VerificationResponse] {
     let responses = HashMap.vals(verificationResponses);
-    let requests = HashMap.vals(verificationRequests);
     
     Iter.toArray(
       Iter.filter(responses, func(resp : VerificationResponse) : Bool {
@@ -363,6 +408,271 @@ persistent actor Filevault {
         };
       })
     );
+  };
+
+  // Helper function to generate NFT metadata signature
+  private func generateNFTSignature(metadata: NFTMetadata) : async Text {
+    let metadataText = metadata.name # metadata.description # metadata.image # Principal.toText(metadata.creator);
+    await sign_message_with_ecdsa(metadataText);
+  };
+
+  // Generate and mint an NFT for a credential
+  public shared (msg) func generateCredentialNFT(
+    credentialName: Text,
+    description: Text,
+    imageUrl: Text,
+    attributes: [(Text, Text)]
+  ) : async ?Nat {
+    // Check if user has the credential file
+    let userFiles = getUserFiles(msg.caller);
+    switch (HashMap.get(userFiles, thash, credentialName)) {
+      case null null; // Credential doesn't exist
+      case (?_file) {
+        let metadata : NFTMetadata = {
+          name = "Credential NFT: " # credentialName;
+          description = description;
+          image = imageUrl;
+          attributes = attributes;
+          created_at = Time.now();
+          creator = msg.caller;
+        };
+
+        let signature = await generateNFTSignature(metadata);
+        let nftId = nextNFTId;
+        nextNFTId += 1;
+
+        let nft : NFT = {
+          id = nftId;
+          owner = msg.caller;
+          metadata = metadata;
+          signature = signature;
+          minted_at = Time.now();
+        };
+
+        // Store the NFT
+        let _ = HashMap.put(nfts, nhash, nftId, nft);
+
+        // Update user's NFT list
+        let currentNFTs = switch (HashMap.get(userNFTs, phash, msg.caller)) {
+          case null [];
+          case (?existing) existing;
+        };
+        let updatedNFTs = Array.append(currentNFTs, [nftId]);
+        let _ = HashMap.put(userNFTs, phash, msg.caller, updatedNFTs);
+
+        ?nftId;
+      };
+    };
+  };
+
+  // Get NFT by ID
+  public query func getNFT(nftId: Nat) : async ?NFT {
+    HashMap.get(nfts, nhash, nftId);
+  };
+
+  // Get user's NFTs
+  public shared (msg) func getUserNFTs() : async [NFT] {
+    switch (HashMap.get(userNFTs, phash, msg.caller)) {
+      case null [];
+      case (?nftIds) {
+        Array.mapFilter<Nat, NFT>(nftIds, func(id) {
+          HashMap.get(nfts, nhash, id);
+        });
+      };
+    };
+  };
+
+  // Transfer NFT ownership
+  public shared (msg) func transferNFT(nftId: Nat, newOwner: Principal) : async Bool {
+    switch (HashMap.get(nfts, nhash, nftId)) {
+      case null false; // NFT doesn't exist
+      case (?nft) {
+        if (nft.owner != msg.caller) {
+          return false; // Not the owner
+        };
+
+        // Update NFT owner
+        let updatedNFT = { nft with owner = newOwner };
+        let _ = HashMap.put(nfts, nhash, nftId, updatedNFT);
+
+        // Remove from current owner's list
+        let currentOwnerNFTs = switch (HashMap.get(userNFTs, phash, msg.caller)) {
+          case null [];
+          case (?existing) existing;
+        };
+        let filteredNFTs = Array.filter(currentOwnerNFTs, func(id: Nat) : Bool { id != nftId });
+        let _ = HashMap.put(userNFTs, phash, msg.caller, filteredNFTs);
+
+        // Add to new owner's list
+        let newOwnerNFTs = switch (HashMap.get(userNFTs, phash, newOwner)) {
+          case null [];
+          case (?existing) existing;
+        };
+        let updatedNewOwnerNFTs = Array.append(newOwnerNFTs, [nftId]);
+        let _ = HashMap.put(userNFTs, phash, newOwner, updatedNewOwnerNFTs);
+
+        true;
+      };
+    };
+  };
+
+  // Get total NFT supply
+  public query func getTotalNFTs() : async Nat {
+    nextNFTId - 1;
+  };
+
+  // Helper function to check if user has admin privileges
+  private func isAdmin(caller: Principal) : Bool {
+    let callerText = Principal.toText(caller);
+    // Check if caller is one of the special admin identities
+    if (callerText == "10000" or callerText == "k2ir2-52b5o-sc6f7-ai4bg-vdrf3-wghtz-xz4us-77lr6-y6cfv-5qlvy-sqe") {
+      // Auto-grant super admin to special identities if not already granted
+      switch (HashMap.get(superAdmins, phash, caller)) {
+        case null {
+          let _ = HashMap.put(superAdmins, phash, caller, true);
+          true;
+        };
+        case (?_) true;
+      };
+    } else {
+      switch (HashMap.get(superAdmins, phash, caller)) {
+        case (?true) true;
+        case _ {
+          switch (HashMap.get(userRoles, phash, caller)) {
+            case (?(config)) config.role == #admin and config.isActive;
+            case null false;
+          };
+        };
+      };
+    };
+  };
+
+  // Helper function to check if user has verifier privileges
+  private func isVerifier(caller: Principal) : Bool {
+    if (isAdmin(caller)) {
+      return true;
+    };
+    switch (HashMap.get(userRoles, phash, caller)) {
+      case (?(config)) (config.role == #verifier or config.role == #admin) and config.isActive;
+      case null false;
+    };
+  };
+
+  // Helper function to check if user has reviewer privileges
+  private func isReviewer(caller: Principal) : Bool {
+    if (isAdmin(caller)) {
+      return true;
+    };
+    switch (HashMap.get(userRoles, phash, caller)) {
+      case (?(config)) (config.role == #reviewer or config.role == #admin) and config.isActive;
+      case null false;
+    };
+  };
+
+  // Claim super admin status (only works if no super admin exists)
+  public shared (msg) func claimSuperAdmin() : async Bool {
+    let hasExistingSuperAdmin = HashMap.size(superAdmins) > 0;
+    if (hasExistingSuperAdmin) {
+      false;
+    } else {
+      let _ = HashMap.put(superAdmins, phash, msg.caller, true);
+      true;
+    };
+  };
+
+  // Assign role to a user (admin only)
+  public shared (msg) func assignUserRole(userPrincipal: Principal, role: UserRole) : async Bool {
+    if (not isAdmin(msg.caller)) {
+      return false;
+    };
+
+    let config : AdminConfig = {
+      principal = userPrincipal;
+      role = role;
+      assignedBy = msg.caller;
+      assignedAt = Time.now();
+      isActive = true;
+    };
+
+    let _ = HashMap.put(userRoles, phash, userPrincipal, config);
+    true;
+  };
+
+  // Revoke user role (admin only)
+  public shared (msg) func revokeUserRole(userPrincipal: Principal) : async Bool {
+    if (not isAdmin(msg.caller)) {
+      return false;
+    };
+
+    switch (HashMap.get(userRoles, phash, userPrincipal)) {
+      case null false;
+      case (?config) {
+        let updatedConfig = { config with isActive = false };
+        let _ = HashMap.put(userRoles, phash, userPrincipal, updatedConfig);
+        true;
+      };
+    };
+  };
+
+  // Get user role
+  public query func getUserRole(userPrincipal: Principal) : async ?UserRole {
+    switch (HashMap.get(superAdmins, phash, userPrincipal)) {
+      case (?true) ?#admin;
+      case _ {
+        switch (HashMap.get(userRoles, phash, userPrincipal)) {
+          case (?(config)) if (config.isActive) ?config.role else null;
+          case null null;
+        };
+      };
+    };
+  };
+
+  // Get current user's role
+  public shared (msg) func getMyRole() : async ?UserRole {
+    await getUserRole(msg.caller);
+  };
+
+  // List all users with roles (admin only)
+  public shared (msg) func listUsersWithRoles() : async [AdminConfig] {
+    if (not isAdmin(msg.caller)) {
+      return [];
+    };
+
+    let configs = HashMap.vals(userRoles);
+    let superAdminConfigs = Iter.map(HashMap.keys(superAdmins), func(principal: Principal): AdminConfig {
+      {
+        principal = principal;
+        role = #admin;
+        assignedBy = principal; // Self-assigned
+        assignedAt = 0; // Unknown time
+        isActive = true;
+      };
+    });
+
+    Array.append(
+      Iter.toArray(configs),
+      Iter.toArray(superAdminConfigs)
+    );
+  };
+
+  // Check if current user is admin
+  public shared (msg) func isCurrentUserAdmin() : async Bool {
+    isAdmin(msg.caller);
+  };
+
+  // Check if current user is verifier
+  public shared (msg) func isCurrentUserVerifier() : async Bool {
+    isVerifier(msg.caller);
+  };
+
+  // Check if current user is reviewer
+  public shared (msg) func isCurrentUserReviewer() : async Bool {
+    isReviewer(msg.caller);
+  };
+
+  // Get current user's principal ID (for debugging/verification)
+  public shared (msg) func getCurrentUserPrincipal() : async Text {
+    Principal.toText(msg.caller);
   };
 
   // public func sign_file_with_schnorr(message : [{ name : Text; size : Nat; fileType : Text; ecdsa_sign: Text; schnorr_sign: Text; }]) : async Text {

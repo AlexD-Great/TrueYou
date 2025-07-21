@@ -1,10 +1,251 @@
-* {
+/* Import the global styles first */
+@import './styles/globals.css';
+
+/* Main App Layout */
+.app {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 280px;
+  margin-top: 72px;
+  background: var(--bg-primary);
+  min-height: calc(100vh - 72px);
+  transition: all 0.3s ease;
+}
+
+/* Login Screen */
+.login-screen {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-color-dark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 400px;
+  padding: 24px;
+}
+
+.login-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 48px;
+  text-align: center;
+  box-shadow: 0 20px 64px var(--shadow-heavy);
+}
+
+.login-card .logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.login-card .logo-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.login-card h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
   margin: 0;
 }
 
-.main-container {
+.login-card p {
+  color: var(--text-secondary);
+  margin: 16px 0 32px 0;
+}
+
+.login-btn {
+  width: 100%;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.login-btn:hover {
+  background: var(--primary-color-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px var(--shadow-medium);
+}
+
+/* Content Views */
+.upload-view,
+.credentials-view,
+.nfts-view {
+  padding: 24px;
+}
+
+.upload-header,
+.credentials-header,
+.nfts-header {
+  margin-bottom: 32px;
+}
+
+.upload-header h1,
+.credentials-header h1,
+.nfts-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.upload-header p,
+.credentials-header p,
+.nfts-header p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.file-input {
+  width: 100%;
+  padding: 16px;
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-input:hover {
+  border-color: var(--primary-color);
+  background: var(--primary-color-light);
+}
+
+.error-message {
+  background: var(--error-bg);
+  color: var(--error-color);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  border: 1px solid var(--error-color);
+}
+
+.progress-info {
+  background: var(--info-bg);
+  color: var(--info-color);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  border: 1px solid var(--info-color);
+}
+
+.credentials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.credential-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.2s ease;
+}
+
+.credential-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 32px var(--shadow-medium);
+}
+
+.credential-info h3 {
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.credential-info p {
+  color: var(--text-secondary);
+  margin: 4px 0;
+  font-size: 0.875rem;
+}
+
+.credential-actions {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 90vh;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.credential-actions button {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.credential-actions button:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--primary-color);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-secondary);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 0;
+  }
+  
+  .app.sidebar-open .main-content {
+    margin-left: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+  }
+  
+  .app.sidebar-open .main-content {
+    margin-left: 0;
+  }
+  
+  .credentials-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .login-card {
+    padding: 32px 24px;
+  }
+  
+  .upload-view,
+  .credentials-view,
+  .nfts-view {
+    padding: 16px;
+  }
 }

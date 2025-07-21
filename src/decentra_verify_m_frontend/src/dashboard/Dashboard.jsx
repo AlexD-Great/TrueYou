@@ -4,11 +4,19 @@ import VerificationRequests from "../verification/VerificationRequests";
 import RequestVerification from "../verification/RequestVerification";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { ThemeProvider } from "../context/ThemeContext";
+import Sidebar from "../components/Sidebar";
+import Header from "../components/Header";
+import DashboardHome from "../components/Dashboard";
+import AdminPanel from "../admin/AdminPanel";
+import UploadCredentials from "../components/UploadCredentials";
+import "../styles/globals.css";
 import "./dashboard.css";
 
 const Dashboard = () => {
   const { isAuthenticated, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState("credentials");
+  const [currentView, setCurrentView] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   let navigate = useNavigate();
 
   useEffect(() => {
@@ -17,76 +25,46 @@ const Dashboard = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const renderTabContent = () => {
-    switch (activeTab) {
+  const handleMenuToggle = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const renderMainContent = () => {
+    switch (currentView) {
+      case "dashboard":
+        return <DashboardHome />;
       case "credentials":
-        return <Credentials />;
+        return <UploadCredentials />;
       case "verification-requests":
         return <VerificationRequests />;
       case "request-verification":
         return <RequestVerification />;
+      case "admin":
+        return <AdminPanel />;
       default:
-        return <Credentials />;
+        return <DashboardHome />;
     }
   };
 
   return (
-    <div>
-      {/* Header */}
-      <header>
-        <div className="head-top">
-          <div className="container-fluid">
-            <div className="row d_flex">
-              <div className="col-sm-3">
-                <div className="logo">
-                  <a href="/">DecentraVerify</a>
-                </div>
-              </div>
-              <div className="col-sm-6">
-                <nav className="dashboard-nav">
-                  <button
-                    className={`nav-tab ${activeTab === "credentials" ? "active" : ""}`}
-                    onClick={() => setActiveTab("credentials")}
-                  >
-                    My Credentials
-                  </button>
-                  <button
-                    className={`nav-tab ${activeTab === "verification-requests" ? "active" : ""}`}
-                    onClick={() => setActiveTab("verification-requests")}
-                  >
-                    Verification Requests
-                  </button>
-                  <button
-                    className={`nav-tab ${activeTab === "request-verification" ? "active" : ""}`}
-                    onClick={() => setActiveTab("request-verification")}
-                  >
-                    Request Verification
-                  </button>
-                </nav>
-              </div>
-              <div className="col-sm-3">
-                <button onClick={logout} className="logout-btn">
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-      <div className="dashboard-header">
-        <div className="dashboard-nav">
-          <h2>Dashboard</h2>
-        </div>
-        {isAuthenticated ? (
-          <p>Welcome to the dashboard!</p>
-        ) : (
-          <p>Not logged in</p>
-        )}
+    <ThemeProvider>
+      <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <Sidebar 
+          currentView={currentView} 
+          setCurrentView={setCurrentView}
+          userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
+          onLogout={logout}
+        />
+        <Header 
+          onLogout={logout}
+          onMenuToggle={handleMenuToggle}
+          userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
+        />
+        <main className="main-content">
+          {renderMainContent()}
+        </main>
       </div>
-      <div className="dashboard-items">
-        {renderTabContent()}
-      </div>
-    </div>
+    </ThemeProvider>
   );
 };
 
