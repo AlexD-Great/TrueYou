@@ -1,283 +1,349 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { Principal } from "@dfinity/principal";
 import "./verification.css";
 
 const RequestVerification = () => {
   const { isAuthenticated, actor } = useAuth();
-  const [holderPrincipal, setHolderPrincipal] = useState("");
-  const [credentialName, setCredentialName] = useState("");
+  const [selectedCredential, setSelectedCredential] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [sentRequests, setSentRequests] = useState([]);
-  const [responses, setResponses] = useState([]);
+  const [userCredentials, setUserCredentials] = useState([]);
+  const [submittedRequests, setSubmittedRequests] = useState([]);
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadSentRequests();
-      loadResponses();
+      loadUserCredentials();
+      loadSubmittedRequests();
     }
   }, [isAuthenticated]);
 
-  const loadSentRequests = async () => {
+  const loadUserCredentials = async () => {
     try {
-      const requests = await actor.getSentVerificationRequests();
-      setSentRequests(requests);
+      const files = await actor.getFiles();
+      setUserCredentials(files);
     } catch (err) {
-      console.error("Failed to load sent requests:", err);
+      console.error("Failed to load user credentials:", err);
+      setError("Failed to load your credentials.");
     }
   };
 
-  const loadResponses = async () => {
+  const loadSubmittedRequests = async () => {
     try {
-      const responsesList = await actor.getVerificationResponses();
-      setResponses(responsesList);
+      const requests = await actor.getUserSubmittedRequests();
+      setSubmittedRequests(requests);
     } catch (err) {
-      console.error("Failed to load responses:", err);
+      console.error("Failed to load submitted requests:", err);
     }
   };
+
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
     
-    if (!holderPrincipal || !credentialName || !requestMessage) {
-      setError("Please fill in all fields.");
+    if (!selectedCredential || !requestMessage) {
+      setError("Please select a credential and provide a request message.");
       return;
     }
 
     try {
       setLoading(true);
-      const holderPrincipalObj = Principal.fromText(holderPrincipal);
-      const requestId = await actor.createVerificationRequest(
-        holderPrincipalObj,
-        credentialName,
-        requestMessage
-      );
       
-      setSuccess(`Verification request sent successfully! Request ID: ${requestId}`);
-      setHolderPrincipal("");
-      setCredentialName("");
+      // Find the selected credential details
+      const credential = userCredentials.find(cred => cred.name === selectedCredential);
+      if (!credential) {
+        setError("Selected credential not found.");
+        return;
+      }
+      
+      // Submit verification request to the pool
+      const requestId = await actor.submitVerificationRequest(selectedCredential, requestMessage);
+      
+      if (requestId.startsWith("ERROR:")) {
+        setError(requestId);
+        return;
+      }
+      
+      setSuccess(`Verification request submitted successfully! Request ID: ${requestId}`);
+      setSelectedCredential("");
       setRequestMessage("");
       
-      // Reload sent requests
-      await loadSentRequests();
+      // Reload submitted requests
+      await loadSubmittedRequests();
     } catch (err) {
-      console.error("Failed to send verification request:", err);
-      setError("Failed to send verification request. Please check the Principal ID format and try again.");
+      console.error("Failed to submit verification request:", err);
+      setError("Failed to submit verification request. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const formatTimestamp = (timestamp) => {
-    return new Date(Number(timestamp) / 1000000).toLocaleString();
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "pending":
-        return "text-yellow-600 bg-yellow-100";
-      case "approved":
-        return "text-green-600 bg-green-100";
-      case "rejected":
-        return "text-red-600 bg-red-100";
-      default:
-        return "text-gray-600 bg-gray-100";
+  const handleGenerateNFT = async (request) => {
+    try {
+      setLoading(true);
+      setError("");
+      setSuccess("");
+      
+      // Prepare NFT metadata
+      const description = `Verified credential certificate for ${request.credentialName}. This NFT serves as proof of successful verification by certified verifiers.`;
+      const imageUrl = "https://via.placeholder.com/400x400/4F46E5/FFFFFF?text=Verified+Credential"; // Placeholder image
+      const attributes = [
+        ["Credential Name", request.credentialName],
+        ["Verification Status", "Verified"],
+        ["Verification Date", new Date().toISOString().split('T')[0]],
+        ["Request ID", request.id || "N/A"]
+      ];
+      
+      // Call the backend to generate NFT for the verified credential
+      const result = await actor.generateCredentialNFT(
+        request.credentialName,
+        description,
+        imageUrl,
+        attributes
+      );
+      
+      // Check if result is null (credential not found) or handle error
+      if (result === null || result === undefined) {
+        setError(`Failed to generate NFT: Credential '${request.credentialName}' not found or access denied.`);
+        return;
+      }
+      
+      setSuccess(`NFT generated successfully for ${request.credentialName}! NFT ID: ${result}`);
+      
+      // Reload submitted requests to update the UI
+      await loadSubmittedRequests();
+    } catch (err) {
+      console.error("Failed to generate NFT:", err);
+      setError("Failed to generate NFT. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusText = (status) => {
-    if (status.pending !== undefined) return "pending";
-    if (status.approved !== undefined) return "approved";
-    if (status.rejected !== undefined) return "rejected";
-    return "unknown";
-  };
-
-  const getResponseForRequest = (requestId) => {
-    return responses.find(response => response.requestId === requestId);
-  };
 
   if (!isAuthenticated) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="mt-4 rounded-md border-l-4 bg-neutral-200 p-4 shadow-md">
-          <p className="mt-2 text-black">
-            Please sign in to request credential verification.
-          </p>
+      <div className="verification-container">
+        <div className="request-card">
+          <div className="empty-state">
+            <p>Please sign in to submit credentials for verification.</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Request Credential Verification</h1>
-        <p className="text-gray-600">
-          Request verification of credentials from document holders.
+    <div className="verification-container">
+      <div className="verification-header">
+        <h1>Submit Credential for Verification</h1>
+        <p>
+          Submit your credentials to the verification pool for review by certified verifiers.
         </p>
       </div>
 
       {/* Request Form */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">New Verification Request</h2>
+      <div className="request-card">
+        <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>Submit Verification Request</h2>
         
         {error && (
-          <div className="mb-4 rounded-md border border-red-400 bg-red-100 p-3 text-red-700">
+          <div className="error-message">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 rounded-md border border-green-400 bg-green-100 p-3 text-green-700">
+          <div style={{ backgroundColor: 'var(--success-bg)', border: '1px solid var(--success-color)', color: 'var(--success-color)', padding: '12px', borderRadius: '6px', marginBottom: '20px' }}>
             {success}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Credential Holder Principal ID *
+            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Select Credential *
             </label>
-            <input
-              type="text"
-              value={holderPrincipal}
-              onChange={(e) => setHolderPrincipal(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter the Principal ID of the credential holder"
+            <select
+              value={selectedCredential}
+              onChange={(e) => setSelectedCredential(e.target.value)}
+              style={{ 
+                width: '100%', 
+                padding: '12px', 
+                border: '1px solid var(--border-color)', 
+                borderRadius: '6px',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '0.9rem'
+              }}
               required
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              The Principal ID of the person whose credentials you want to verify.
+            >
+              <option value="">Select a credential to verify</option>
+              {userCredentials.map((credential, index) => (
+                <option key={index} value={credential.name}>
+                  {credential.name} ({credential.fileType || 'Unknown type'})
+                </option>
+              ))}
+            </select>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Choose one of your uploaded credentials to submit for verification.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Credential Name *
-            </label>
-            <input
-              type="text"
-              value={credentialName}
-              onChange={(e) => setCredentialName(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter the name of the credential file"
-              required
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              The exact filename of the credential you want to verify.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '8px' }}>
               Request Message *
             </label>
             <textarea
               value={requestMessage}
               onChange={(e) => setRequestMessage(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="response-textarea"
               rows="4"
-              placeholder="Explain why you need to verify this credential..."
+              placeholder="Explain why you need this credential verified (e.g., job application, academic admission, etc.)..."
               required
+              style={{ 
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)'
+              }}
             />
-            <p className="text-sm text-gray-500 mt-1">
-              Provide context about your verification request to help the holder understand your purpose.
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Provide context about why you need this credential verified. This will help verifiers prioritize and understand your request.
             </p>
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-blue-500 text-white py-3 px-4 rounded-md hover:bg-blue-600 disabled:bg-gray-400 font-medium"
+            disabled={loading || userCredentials.length === 0}
+            className="btn btn-respond"
+            style={{ width: '100%', padding: '12px', fontSize: '0.95rem' }}
           >
-            {loading ? "Sending Request..." : "Send Verification Request"}
+            {loading ? "Submitting Request..." : "Submit for Verification"}
           </button>
         </form>
       </div>
 
-      {/* Sent Requests */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Sent Requests</h2>
+      {/* Show message if no credentials */}
+      {userCredentials.length === 0 && (
+        <div className="request-card" style={{ marginTop: '20px' }}>
+          <div className="empty-state">
+            <p>You haven't uploaded any credentials yet.</p>
+            <p>Upload credentials first to submit them for verification.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Submitted Requests */}
+      <div style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>Submitted Verification Requests</h2>
         
-        {sentRequests.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500">No verification requests sent yet.</p>
+        {submittedRequests.length === 0 ? (
+          <div className="empty-state">
+            <p>No verification requests submitted yet.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {sentRequests.map((request) => {
-              const response = getResponseForRequest(request.id);
-              const status = getStatusText(request.status);
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {submittedRequests.map((request, index) => {
+              // Convert the backend status to a readable string
+              const getStatusString = (status) => {
+                if (status.unverified !== undefined) return 'unverified';
+                if (status.claimed !== undefined) return 'claimed';
+                if (status.verified !== undefined) return 'verified';
+                if (status.rejected !== undefined) return 'rejected';
+                return 'unknown';
+              };
+              
+              const statusString = getStatusString(request.status);
+              const formatTimestamp = (timestamp) => {
+                return new Date(Number(timestamp) / 1000000).toLocaleDateString();
+              };
               
               return (
-                <div
-                  key={request.id}
-                  className="bg-white rounded-lg shadow-md p-6 border border-gray-200"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {request.credentialName}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        To: {request.holder.toText()}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Sent: {formatTimestamp(request.createdAt)}
-                      </p>
+                <div key={index} className="request-card">
+                  <div className="request-header">
+                    <div className="request-info">
+                      <h3>{request.credentialName}</h3>
+                      <p>Status: {statusString.charAt(0).toUpperCase() + statusString.slice(1)}</p>
+                      <p>Submitted: {formatTimestamp(request.submittedAt)}</p>
+                      {request.claimedBy && request.claimedBy.length > 0 && (
+                        <p>Claimed by: {typeof request.claimedBy === 'string' ? request.claimedBy.slice(0, 12) : (request.claimedBy.toText ? request.claimedBy.toText().slice(0, 12) : String(request.claimedBy).slice(0, 12))}...</p>
+                      )}
                     </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(status)}`}
-                    >
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    <span className={`status-badge status-${statusString}`}>
+                      {statusString.charAt(0).toUpperCase() + statusString.slice(1)}
                     </span>
                   </div>
 
-                  <div className="mb-4">
-                    <p className="text-sm font-medium text-gray-700 mb-2">
-                      Your Request:
-                    </p>
-                    <p className="text-gray-600 bg-gray-50 p-3 rounded-md text-sm">
+                  <div className="request-message">
+                    <span className="request-message-label">Your Message:</span>
+                    <div className="request-message-content">
                       {request.requestMessage}
-                    </p>
+                    </div>
                   </div>
 
-                  {response && (
-                    <div className="border-t pt-4">
-                      <p className="text-sm font-medium text-gray-700 mb-2">
-                        Response ({formatTimestamp(response.respondedAt)}):
-                      </p>
-                      <p className="text-gray-600 bg-gray-50 p-3 rounded-md text-sm mb-3">
-                        {response.responseMessage}
-                      </p>
-                      
-                      {response.approved && response.credentialData && (
-                        <div className="bg-green-50 p-4 rounded-md">
-                          <h4 className="font-semibold text-green-800 mb-2">
-                            Verification Data:
-                          </h4>
-                          <div className="text-sm space-y-1">
-                            <p><strong>File:</strong> {response.credentialData.name}</p>
-                            <p><strong>Type:</strong> {response.credentialData.fileType}</p>
-                            <p><strong>Size:</strong> {response.credentialData.size} bytes</p>
-                            <p><strong>ECDSA Signature:</strong> 
-                              <span className="font-mono text-xs ml-2">
-                                {response.credentialData.ecdsa_sign.slice(0, 20)}...
-                              </span>
-                            </p>
-                            <p><strong>Schnorr Signature:</strong> 
-                              <span className="font-mono text-xs ml-2">
-                                {response.credentialData.schnorr_sign.slice(0, 20)}...
-                              </span>
-                            </p>
-                          </div>
-                        </div>
+                  {request.verifierResponse && (
+                    <div className="response-section">
+                      <span className="request-message-label">
+                        Verifier Response:
+                      </span>
+                      <div className="request-message-content">
+                        {request.verifierResponse}
+                      </div>
+                      {request.processedAt && (
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '8px' }}>
+                          Processed: {formatTimestamp(request.processedAt)}
+                        </p>
                       )}
+                    </div>
+                  )}
+                  
+                  {/* NFT Generation Button for Verified Credentials */}
+                  {statusString === 'verified' && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                      <button
+                        onClick={() => handleGenerateNFT(request)}
+                        disabled={loading}
+                        className="btn btn-primary"
+                        style={{
+                          backgroundColor: 'var(--accent-color)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '10px 20px',
+                          borderRadius: '6px',
+                          fontSize: '0.9rem',
+                          fontWeight: '500',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          opacity: loading ? 0.7 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!loading) {
+                            e.target.style.backgroundColor = 'var(--accent-hover)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!loading) {
+                            e.target.style.backgroundColor = 'var(--accent-color)';
+                          }
+                        }}
+                      >
+                        <span>🎨</span>
+                        {loading ? 'Generating NFT...' : 'Generate NFT'}
+                      </button>
+                      <p style={{ 
+                        fontSize: '0.8rem', 
+                        color: 'var(--text-secondary)', 
+                        marginTop: '8px',
+                        fontStyle: 'italic'
+                      }}>
+                        Generate an NFT certificate for your verified credential
+                      </p>
                     </div>
                   )}
                 </div>

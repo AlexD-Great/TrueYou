@@ -186,6 +186,10 @@
   color: var(--text-secondary);
 }
 
+[data-theme="dark"] .table-header {
+  color: var(--text-primary);
+}
+
 .table-row {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
@@ -241,6 +245,14 @@
   color: var(--text-secondary);
 }
 
+[data-theme="dark"] .credential-name {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .credential-institution {
+  color: var(--text-secondary);
+}
+
 .status-badge {
   padding: 4px 12px;
   border-radius: 16px;
@@ -277,6 +289,10 @@
 .date-text {
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+[data-theme="dark"] .date-text {
+  color: var(--text-primary);
 }
 
 .action-buttons {

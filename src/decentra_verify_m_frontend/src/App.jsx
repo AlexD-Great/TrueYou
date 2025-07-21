@@ -8,6 +8,7 @@ import Dashboard from "./components/Dashboard";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import AdminPanel from "./admin/AdminPanel";
+import MyNFTs from "./components/MyNFTs";
 import "./styles/globals.css";
 import "./index.css";
 
@@ -189,6 +190,7 @@ function App() {
   };
 
   const renderMainContent = () => {
+    console.log("currentView", currentView);
     switch (currentView) {
       case "dashboard":
         return <Dashboard />;
@@ -265,17 +267,7 @@ function App() {
     </div>
   );
 
-  const renderNFTsView = () => (
-    <div className="nfts-view">
-      <div className="nfts-header">
-        <h1>My NFTs</h1>
-        <p>View and manage your credential NFTs</p>
-      </div>
-      <div className="nfts-content">
-        <p>NFT functionality coming soon...</p>
-      </div>
-    </div>
-  );
+  const renderNFTsView = () => <MyNFTs />;
 
   if (!isAuthenticated) {
     return (
@@ -305,7 +297,7 @@ function App() {
           <Sidebar 
             currentView={currentView} 
             setCurrentView={setCurrentView}
-            userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
+            onLogout={logout}
           />
           <Header 
             onLogout={logout}

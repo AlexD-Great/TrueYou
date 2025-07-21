@@ -280,7 +280,7 @@ const UploadCredentials = () => {
                 <div className="file-info">
                   <h3 className="file-name">{file.name}</h3>
                   <div className="file-details">
-                    <span className="file-size">{(file.size / 1024).toFixed(1)} KB</span>
+                    <span className="file-size">{(Number(file.size) / 1024).toFixed(1)} KB</span>
                     <span className="file-type">{file.fileType || 'Unknown'}</span>
                   </div>
                   <div className="file-status">

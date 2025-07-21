@@ -167,6 +167,7 @@
   background: var(--bg-tertiary);
 }
 
+
 .user-menu .user-info {
   display: flex;
   flex-direction: column;

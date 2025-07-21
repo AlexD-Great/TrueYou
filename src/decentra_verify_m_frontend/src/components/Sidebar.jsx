@@ -3,10 +3,12 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../auth/AuthContext";
 import "./sidebar.css";
 
-const Sidebar = ({ currentView, setCurrentView, userInfo, onLogout }) => {
+const Sidebar = ({ currentView, setCurrentView, onLogout }) => {
   const { theme } = useTheme();
   const { actor } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isVerifier, setIsVerifier] = useState(false);
+  const [userPrincipal, setUserPrincipal] = useState("");
 
   useEffect(() => {
     if (actor) {
@@ -17,26 +19,37 @@ const Sidebar = ({ currentView, setCurrentView, userInfo, onLogout }) => {
   const checkAdminStatus = async () => {
     try {
       // Get current user principal for debugging
-      const userPrincipal = await actor.getCurrentUserPrincipal();
-      console.log("🔍 Sidebar - Current user principal:", userPrincipal);
+      const principal = await actor.getCurrentUserPrincipal();
+      console.log("🔍 Sidebar - Current user principal:", principal);
+      setUserPrincipal(principal);
       
-      // Check admin status
+      // Check user roles
       const adminStatus = await actor.isCurrentUserAdmin();
-      console.log("🔍 Sidebar - Admin status check result:", adminStatus);
+      const verifierStatus = await actor.isCurrentUserVerifier();
+      const reviewerStatus = await actor.isCurrentUserReviewer();
+      
+      const hasVerifierRights = adminStatus || verifierStatus || reviewerStatus;
+      
+      console.log("🔍 Sidebar - Admin status:", adminStatus);
+      console.log("🔍 Sidebar - Verifier status:", verifierStatus);
+      console.log("🔍 Sidebar - Reviewer status:", reviewerStatus);
+      console.log("🔍 Sidebar - Has verifier rights:", hasVerifierRights);
       
       setIsAdmin(adminStatus);
+      setIsVerifier(hasVerifierRights);
       
-      // Log menu items array length for debugging
-      const menuItemsWithAdmin = [
-        "dashboard", "credentials", "verification-requests", "request-verification",
+      // Log menu items that will be shown
+      const menuItemsToShow = [
+        "dashboard", "credentials", "request-verification",
+        ...(hasVerifierRights ? ["verification-requests"] : []),
         ...(adminStatus ? ["admin"] : [])
       ];
-      console.log("🔍 Sidebar - Menu items to render:", menuItemsWithAdmin);
-      console.log("🔍 Sidebar - Admin panel will be shown:", adminStatus ? "YES" : "NO");
+      console.log("🔍 Sidebar - Menu items to render:", menuItemsToShow);
       
     } catch (error) {
-      console.error("❌ Sidebar - Error checking admin status:", error);
+      console.error("❌ Sidebar - Error checking user status:", error);
       setIsAdmin(false);
+      setIsVerifier(false);
     }
   };
 
@@ -64,6 +77,20 @@ const Sidebar = ({ currentView, setCurrentView, userInfo, onLogout }) => {
       )
     },
     {
+      id: "nfts",
+      label: "My NFTs",
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+          <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2"/>
+          <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2"/>
+          <path d="M7 7h10v6H7z" stroke="currentColor" strokeWidth="2" fill="none"/>
+          <circle cx="12" cy="10" r="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+        </svg>
+      )
+    },
+    // Conditionally include Verification Requests only for verifiers/reviewers/admins
+    ...(isVerifier ? [{
       id: "verification-requests",
       label: "Verification Requests",
       icon: (
@@ -72,7 +99,7 @@ const Sidebar = ({ currentView, setCurrentView, userInfo, onLogout }) => {
           <polyline points="22,4 12,14.01 9,11.01" stroke="currentColor" strokeWidth="2"/>
         </svg>
       )
-    },
+    }] : []),
     {
       id: "request-verification",
       label: "Request Verification",
@@ -145,6 +172,7 @@ const Sidebar = ({ currentView, setCurrentView, userInfo, onLogout }) => {
   ];
 
   const handleItemClick = (itemId) => {
+    console.log("handleItemClick", itemId);
     setCurrentView(itemId);
   };
 
@@ -160,12 +188,14 @@ const Sidebar = ({ currentView, setCurrentView, userInfo, onLogout }) => {
       <div className="sidebar-content">
         <div className="user-info">
           <div className="user-avatar">
-            <img src="/api/placeholder/32/32" alt="User Avatar" />
+            <div className="avatar-fallback">
+              {userPrincipal ? userPrincipal.slice(0, 2).toUpperCase() : "U"}
+            </div>
             <div className="user-status online"></div>
           </div>
           <div className="user-details">
-            <div className="user-name">{userInfo?.name || "Alex Johnson"}</div>
-            <div className="user-email">{userInfo?.email || "alex@example.com"}</div>
+            <div className="user-name">{userPrincipal ? userPrincipal.slice(0, 8) + '...' : "Loading..."}</div>
+            <div className="user-email">{userPrincipal || "Loading principal..."}</div>
           </div>
         </div>
 
