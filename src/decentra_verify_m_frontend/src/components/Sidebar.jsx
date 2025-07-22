@@ -9,6 +9,7 @@ const Sidebar = ({ currentView, setCurrentView, onLogout }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVerifier, setIsVerifier] = useState(false);
   const [userPrincipal, setUserPrincipal] = useState("");
+  console.log('currentView', currentView)
 
   useEffect(() => {
     if (actor) {
@@ -173,6 +174,7 @@ const Sidebar = ({ currentView, setCurrentView, onLogout }) => {
 
   const handleItemClick = (itemId) => {
     console.log("handleItemClick", itemId);
+    console.log("🔧 setCurrentView function:", setCurrentView.name || "anonymous");
     setCurrentView(itemId);
   };
 

@@ -10,6 +10,7 @@ import Header from "../components/Header";
 import DashboardHome from "../components/Dashboard";
 import AdminPanel from "../admin/AdminPanel";
 import UploadCredentials from "../components/UploadCredentials";
+import MyNFTs from "../components/MyNFTs";
 import "../styles/globals.css";
 import "./dashboard.css";
 
@@ -30,11 +31,14 @@ const Dashboard = () => {
   };
 
   const renderMainContent = () => {
+    console.log("🔄 Dashboard renderMainContent called with currentView:", currentView);
     switch (currentView) {
       case "dashboard":
         return <DashboardHome />;
       case "credentials":
         return <UploadCredentials />;
+      case "nfts":
+        return <MyNFTs />;
       case "verification-requests":
         return <VerificationRequests />;
       case "request-verification":

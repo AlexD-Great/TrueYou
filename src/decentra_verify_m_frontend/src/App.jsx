@@ -4,11 +4,14 @@ import { canisterId } from "declarations/decentra_verify_m_backend/index.js";
 import React, { useState, useEffect } from "react";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./auth/AuthContext";
+import { NavigationProvider, useNavigation } from "./context/NavigationContext";
 import Dashboard from "./components/Dashboard";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import AdminPanel from "./admin/AdminPanel";
 import MyNFTs from "./components/MyNFTs";
+import RequestVerification from "./verification/RequestVerification";
+import VerificationRequests from "./verification/VerificationRequests";
 import "./styles/globals.css";
 import "./index.css";
 
@@ -18,14 +21,14 @@ const identityProvider =
     ? "https://identity.ic0.app" // Mainnet
     : "http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943"; // Local
 
-function App() {
+const AppContent = () => {
+  const { currentView } = useNavigation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authClient, setAuthClient] = useState();
   const [actor, setActor] = useState();
   const [files, setFiles] = useState([]);
   const [errorMessage, setErrorMessage] = useState();
   const [fileTransferProgress, setFileTransferProgress] = useState();
-  const [currentView, setCurrentView] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -39,6 +42,11 @@ function App() {
     }
   }, [isAuthenticated]);
 
+  // Debug currentView changes
+  useEffect(() => {
+    console.log("📍 currentView state changed to:", currentView);
+  }, [currentView]);
+
   async function updateActor() {
     const authClient = await AuthClient.create();
     const identity = authClient.getIdentity();
@@ -48,11 +56,19 @@ function App() {
       },
     });
     console.log(canisterId);
-    const isAuthenticated = await authClient.isAuthenticated();
+    const newIsAuthenticated = await authClient.isAuthenticated();
 
     setActor(actor);
     setAuthClient(authClient);
-    setIsAuthenticated(isAuthenticated);
+    
+    // Only update isAuthenticated if it actually changed to prevent unnecessary re-renders
+    setIsAuthenticated(prevAuth => {
+      if (prevAuth !== newIsAuthenticated) {
+        console.log("🔐 Authentication status changed:", prevAuth, "->", newIsAuthenticated);
+        return newIsAuthenticated;
+      }
+      return prevAuth;
+    });
   }
 
   async function login() {
@@ -190,7 +206,7 @@ function App() {
   };
 
   const renderMainContent = () => {
-    console.log("currentView", currentView);
+    console.log("🔄 renderMainContent called with currentView:", currentView);
     switch (currentView) {
       case "dashboard":
         return <Dashboard />;
@@ -200,6 +216,10 @@ function App() {
         return renderCredentialsView();
       case "nfts":
         return renderNFTsView();
+      case "request-verification":
+        return <RequestVerification />;
+      case "verification-requests":
+        return <VerificationRequests />;
       case "admin":
         return <AdminPanel />;
       default:
@@ -268,6 +288,7 @@ function App() {
   );
 
   const renderNFTsView = () => <MyNFTs />;
+  console.log('renderNFTsView')
 
   if (!isAuthenticated) {
     return (
@@ -289,26 +310,33 @@ function App() {
       </ThemeProvider>
     );
   }
+  console.log('renderNFTsView-2')
 
   return (
-    <ThemeProvider>
+    <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
       <AuthProvider>
-        <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
-          <Sidebar 
-            currentView={currentView} 
-            setCurrentView={setCurrentView}
-            onLogout={logout}
-          />
-          <Header 
-            onLogout={logout}
-            onMenuToggle={handleMenuToggle}
-            userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
-          />
-          <main className="main-content">
-            {renderMainContent()}
-          </main>
-        </div>
+        <Sidebar 
+          onLogout={logout}
+        />
+        <Header 
+          onLogout={logout}
+          onMenuToggle={handleMenuToggle}
+          userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
+        />
+        <main className="main-content">
+          {renderMainContent()}
+        </main>
       </AuthProvider>
+    </div>
+  );
+};
+
+function App() {
+  return (
+    <ThemeProvider>
+      <NavigationProvider>
+        <AppContent />
+      </NavigationProvider>
     </ThemeProvider>
   );
 }
