@@ -11,6 +11,7 @@ const RequestVerification = () => {
   const [success, setSuccess] = useState("");
   const [userCredentials, setUserCredentials] = useState([]);
   const [submittedRequests, setSubmittedRequests] = useState([]);
+  const [credentialsWithNFTs, setCredentialsWithNFTs] = useState(new Set());
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -33,9 +34,32 @@ const RequestVerification = () => {
     try {
       const requests = await actor.getUserSubmittedRequests();
       setSubmittedRequests(requests);
+      
+      // Check which verified credentials already have NFTs
+      const nftChecks = await Promise.all(
+        requests
+          .filter(req => getStatusString(req.status) === 'verified')
+          .map(async (req) => {
+            const hasNFT = await actor.credentialHasNFT(req.credentialName);
+            return { credentialName: req.credentialName, hasNFT };
+          })
+      );
+      
+      const credentialsWithNFTsSet = new Set(
+        nftChecks.filter(check => check.hasNFT).map(check => check.credentialName)
+      );
+      setCredentialsWithNFTs(credentialsWithNFTsSet);
     } catch (err) {
       console.error("Failed to load submitted requests:", err);
     }
+  };
+
+  const getStatusString = (status) => {
+    if (status.unverified !== undefined) return 'unverified';
+    if (status.claimed !== undefined) return 'claimed';
+    if (status.verified !== undefined) return 'verified';
+    if (status.rejected !== undefined) return 'rejected';
+    return 'unknown';
   };
 
 
@@ -82,6 +106,86 @@ const RequestVerification = () => {
     }
   };
 
+  // Function to generate NFT certificate using Canvas
+  const generateNFTImageUrl = (credentialName) => {
+    // Create canvas element
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Set canvas size
+    canvas.width = 800;
+    canvas.height = 600;
+    
+    // Choose color based on credential name
+    const colors = ['#4F46E5', '#059669', '#DC2626', '#D97706', '#7C3AED', '#DB2777'];
+    const colorIndex = credentialName.length % colors.length;
+    const primaryColor = colors[colorIndex];
+    
+    // Draw background gradient
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, primaryColor);
+    gradient.addColorStop(1, '#1F2937');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw border
+    ctx.strokeStyle = '#FBBF24';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+    
+    // Draw inner border
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(40, 40, canvas.width - 80, canvas.height - 80);
+    
+    // Draw title
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 48px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('VERIFIED CERTIFICATE', canvas.width / 2, 120);
+    
+    // Draw credential name
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillStyle = '#FBBF24';
+    ctx.fillText(credentialName, canvas.width / 2, 200);
+    
+    // Draw verification text
+    ctx.font = '24px sans-serif';
+    ctx.fillStyle = '#E5E7EB';
+    ctx.fillText('This credential has been verified by', canvas.width / 2, 280);
+    ctx.fillText('certified verifiers on the Internet Computer', canvas.width / 2, 310);
+    
+    // Draw date
+    const date = new Date().toLocaleDateString();
+    ctx.font = '20px monospace';
+    ctx.fillStyle = '#9CA3AF';
+    ctx.fillText(`Verified on: ${date}`, canvas.width / 2, 380);
+    
+    // Draw decorative elements
+    ctx.fillStyle = '#FBBF24';
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, 450, 30, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // Draw checkmark in circle
+    ctx.strokeStyle = '#1F2937';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2 - 10, 450);
+    ctx.lineTo(canvas.width / 2 - 5, 455);
+    ctx.lineTo(canvas.width / 2 + 10, 440);
+    ctx.stroke();
+    
+    // Draw "AUTHENTIC" stamp
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillStyle = '#DC2626';
+    ctx.textAlign = 'center';
+    ctx.fillText('AUTHENTIC', canvas.width / 2, 520);
+    
+    // Convert canvas to data URL (base64 image)
+    return canvas.toDataURL('image/png', 0.9);
+  };
+
   const handleGenerateNFT = async (request) => {
     try {
       setLoading(true);
@@ -90,7 +194,7 @@ const RequestVerification = () => {
       
       // Prepare NFT metadata
       const description = `Verified credential certificate for ${request.credentialName}. This NFT serves as proof of successful verification by certified verifiers.`;
-      const imageUrl = "https://via.placeholder.com/400x400/4F46E5/FFFFFF?text=Verified+Credential"; // Placeholder image
+      const imageUrl = generateNFTImageUrl(request.credentialName);
       const attributes = [
         ["Credential Name", request.credentialName],
         ["Verification Status", "Verified"],
@@ -303,47 +407,73 @@ const RequestVerification = () => {
                   {/* NFT Generation Button for Verified Credentials */}
                   {statusString === 'verified' && (
                     <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                      <button
-                        onClick={() => handleGenerateNFT(request)}
-                        disabled={loading}
-                        className="btn btn-primary"
-                        style={{
-                          backgroundColor: 'var(--accent-color)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '10px 20px',
-                          borderRadius: '6px',
-                          fontSize: '0.9rem',
-                          fontWeight: '500',
-                          cursor: loading ? 'not-allowed' : 'pointer',
-                          opacity: loading ? 0.7 : 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!loading) {
-                            e.target.style.backgroundColor = 'var(--accent-hover)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!loading) {
-                            e.target.style.backgroundColor = 'var(--accent-color)';
-                          }
-                        }}
-                      >
-                        <span>🎨</span>
-                        {loading ? 'Generating NFT...' : 'Generate NFT'}
-                      </button>
-                      <p style={{ 
-                        fontSize: '0.8rem', 
-                        color: 'var(--text-secondary)', 
-                        marginTop: '8px',
-                        fontStyle: 'italic'
-                      }}>
-                        Generate an NFT certificate for your verified credential
-                      </p>
+                      {credentialsWithNFTs.has(request.credentialName) ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.2rem' }}>✅</span>
+                          <div>
+                            <p style={{ 
+                              fontSize: '0.9rem', 
+                              color: 'var(--success-color)', 
+                              fontWeight: '500',
+                              margin: '0'
+                            }}>
+                              NFT Already Generated
+                            </p>
+                            <p style={{ 
+                              fontSize: '0.8rem', 
+                              color: 'var(--text-secondary)', 
+                              margin: '4px 0 0 0',
+                              fontStyle: 'italic'
+                            }}>
+                              View your NFT in the "My NFTs" section
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleGenerateNFT(request)}
+                            disabled={loading}
+                            className="btn btn-primary"
+                            style={{
+                              backgroundColor: 'var(--accent-color)',
+                              color: 'white',
+                              border: 'none',
+                              padding: '10px 20px',
+                              borderRadius: '6px',
+                              fontSize: '0.9rem',
+                              fontWeight: '500',
+                              cursor: loading ? 'not-allowed' : 'pointer',
+                              opacity: loading ? 0.7 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!loading) {
+                                e.target.style.backgroundColor = 'var(--accent-hover)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!loading) {
+                                e.target.style.backgroundColor = 'var(--accent-color)';
+                              }
+                            }}
+                          >
+                            <span>🎨</span>
+                            {loading ? 'Generating NFT...' : 'Generate NFT'}
+                          </button>
+                          <p style={{ 
+                            fontSize: '0.8rem', 
+                            color: 'var(--text-secondary)', 
+                            marginTop: '8px',
+                            fontStyle: 'italic'
+                          }}>
+                            Generate an NFT certificate for your verified credential
+                          </p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

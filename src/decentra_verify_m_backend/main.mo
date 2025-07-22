@@ -182,6 +182,8 @@ persistent actor Filevault {
   private var nfts = HashMap.new<Nat, NFT>();
   private var userNFTs = HashMap.new<Principal, [Nat]>();
   private var nextNFTId : Nat = 1;
+  // Track which credentials already have NFTs (Principal + CredentialName -> NFT ID)
+  private var credentialNFTs = HashMap.new<Text, Nat>();
 
   // Admin role management
   private var userRoles = HashMap.new<Principal, AdminConfig>();
@@ -706,39 +708,55 @@ persistent actor Filevault {
     switch (HashMap.get(userFiles, thash, credentialName)) {
       case null null; // Credential doesn't exist
       case (?_file) {
-        let metadata : NFTMetadata = {
-          name = "Credential NFT: " # credentialName;
-          description = description;
-          image = imageUrl;
-          attributes = attributes;
-          created_at = Time.now();
-          creator = msg.caller;
+        // Create unique key for this user's credential
+        let credentialKey = Principal.toText(msg.caller) # "_" # credentialName;
+        
+        // Check if NFT already exists for this credential
+        switch (HashMap.get(credentialNFTs, thash, credentialKey)) {
+          case (?existingNFTId) {
+            // NFT already exists, return the existing ID
+            ?existingNFTId;
+          };
+          case null {
+            // No existing NFT, create new one
+            let metadata : NFTMetadata = {
+              name = "Credential NFT: " # credentialName;
+              description = description;
+              image = imageUrl;
+              attributes = attributes;
+              created_at = Time.now();
+              creator = msg.caller;
+            };
+
+            let signature = await generateNFTSignature(metadata);
+            let nftId = nextNFTId;
+            nextNFTId += 1;
+
+            let nft : NFT = {
+              id = nftId;
+              owner = msg.caller;
+              metadata = metadata;
+              signature = signature;
+              minted_at = Time.now();
+            };
+
+            // Store the NFT
+            let _ = HashMap.put(nfts, nhash, nftId, nft);
+            
+            // Track that this credential now has an NFT
+            let _ = HashMap.put(credentialNFTs, thash, credentialKey, nftId);
+
+            // Update user's NFT list
+            let currentNFTs = switch (HashMap.get(userNFTs, phash, msg.caller)) {
+              case null [];
+              case (?existing) existing;
+            };
+            let updatedNFTs = Array.append(currentNFTs, [nftId]);
+            let _ = HashMap.put(userNFTs, phash, msg.caller, updatedNFTs);
+
+            ?nftId;
+          };
         };
-
-        let signature = await generateNFTSignature(metadata);
-        let nftId = nextNFTId;
-        nextNFTId += 1;
-
-        let nft : NFT = {
-          id = nftId;
-          owner = msg.caller;
-          metadata = metadata;
-          signature = signature;
-          minted_at = Time.now();
-        };
-
-        // Store the NFT
-        let _ = HashMap.put(nfts, nhash, nftId, nft);
-
-        // Update user's NFT list
-        let currentNFTs = switch (HashMap.get(userNFTs, phash, msg.caller)) {
-          case null [];
-          case (?existing) existing;
-        };
-        let updatedNFTs = Array.append(currentNFTs, [nftId]);
-        let _ = HashMap.put(userNFTs, phash, msg.caller, updatedNFTs);
-
-        ?nftId;
       };
     };
   };
@@ -757,6 +775,15 @@ persistent actor Filevault {
           HashMap.get(nfts, nhash, id);
         });
       };
+    };
+  };
+
+  // Check if a credential already has an NFT
+  public shared (msg) func credentialHasNFT(credentialName: Text) : async Bool {
+    let credentialKey = Principal.toText(msg.caller) # "_" # credentialName;
+    switch (HashMap.get(credentialNFTs, thash, credentialKey)) {
+      case (?_nftId) true;
+      case null false;
     };
   };
 

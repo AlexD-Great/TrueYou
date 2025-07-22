@@ -93,14 +93,37 @@ const MyNFTs = () => {
                 <div style={{
                   width: '60px',
                   height: '60px',
-                  backgroundColor: 'var(--accent-color)',
                   borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.5rem'
+                  overflow: 'hidden',
+                  border: '2px solid var(--border-color)'
                 }}>
-                  🎨
+                  {nft.metadata.image ? (
+                    <img 
+                      src={nft.metadata.image} 
+                      alt={`NFT ${nft.id}`}
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'cover' 
+                      }}
+                      onError={(e) => {
+                        // Fallback to emoji if image fails to load
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'var(--accent-color)',
+                    display: nft.metadata.image ? 'none' : 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem'
+                  }}>
+                    🎨
+                  </div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: '600' }}>
@@ -156,6 +179,33 @@ const MyNFTs = () => {
               
               {/* View/Share Actions */}
               <div style={{ marginTop: '1rem', display: 'flex', gap: '8px' }}>
+                <button
+                  className="btn btn-secondary"
+                  style={{
+                    flex: 1,
+                    padding: '8px 16px',
+                    fontSize: '0.85rem',
+                    backgroundColor: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)'
+                  }}
+                  onClick={() => {
+                    // Open image in new tab for full view
+                    if (nft.metadata.image) {
+                      const newWindow = window.open('', '_blank');
+                      newWindow.document.write(`
+                        <html>
+                          <head><title>NFT #${nft.id} - ${nft.metadata.name}</title></head>
+                          <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
+                            <img src="${nft.metadata.image}" alt="NFT #${nft.id}" style="max-width:100%;max-height:100%;object-fit:contain;" />
+                          </body>
+                        </html>
+                      `);
+                    }
+                  }}
+                >
+                  🖼️ View Full Size
+                </button>
                 <button
                   className="btn btn-secondary"
                   style={{
