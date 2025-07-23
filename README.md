@@ -1,10 +1,10 @@
-# DecentraVerify - Credential NFT dApp
+# TrueYou - Credential NFT dApp
 
 A decentralized application (dApp) built on the Internet Computer Protocol (ICP) that enables users to upload credentials, get them verified by reviewers, and mint NFTs from verified credentials.
 
 ## 🎯 Project Overview
 
-DecentraVerify is a credential verification and NFT minting platform that provides:
+TrueYou is a credential verification and NFT minting platform that provides:
 - Secure credential upload and storage
 - Peer-to-peer verification system
 - NFT generation from verified credentials
