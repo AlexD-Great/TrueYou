@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../auth/AuthContext";
+import { useNavigation } from "../context/NavigationContext";
 import "./sidebar.css";
 
-const Sidebar = ({ currentView, setCurrentView, onLogout }) => {
+const Sidebar = ({ onLogout, isOpen, onClose }) => {
+  const { currentView, setCurrentView } = useNavigation();
   const { theme } = useTheme();
   const { actor } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -176,10 +178,15 @@ const Sidebar = ({ currentView, setCurrentView, onLogout }) => {
     console.log("handleItemClick", itemId);
     console.log("🔧 setCurrentView function:", setCurrentView.name || "anonymous");
     setCurrentView(itemId);
+    
+    // Close sidebar on mobile after item selection
+    if (window.innerWidth <= 1024 && onClose) {
+      onClose();
+    }
   };
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
         <div className="logo">
           <div className="logo-icon">📋</div>

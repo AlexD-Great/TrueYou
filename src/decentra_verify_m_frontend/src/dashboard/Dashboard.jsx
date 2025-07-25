@@ -5,6 +5,7 @@ import RequestVerification from "../verification/RequestVerification";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ThemeProvider } from "../context/ThemeContext";
+import { NavigationProvider, useNavigation } from "../context/NavigationContext";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import DashboardHome from "../components/Dashboard";
@@ -14,9 +15,9 @@ import MyNFTs from "../components/MyNFTs";
 import "../styles/globals.css";
 import "./dashboard.css";
 
-const Dashboard = () => {
+const DashboardContent = () => {
   const { isAuthenticated, logout } = useAuth();
-  const [currentView, setCurrentView] = useState("dashboard");
+  const { currentView } = useNavigation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   let navigate = useNavigate();
 
@@ -50,23 +51,36 @@ const Dashboard = () => {
     }
   };
 
+  const handleSidebarClose = () => {
+    setSidebarOpen(false);
+  };
+
+  return (
+    <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      {sidebarOpen && <div className="sidebar-backdrop" onClick={handleSidebarClose} />}
+      <Sidebar 
+        onLogout={logout}
+        isOpen={sidebarOpen}
+        onClose={handleSidebarClose}
+      />
+      <Header 
+        onLogout={logout}
+        onMenuToggle={handleMenuToggle}
+        userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
+      />
+      <main className="main-content">
+        {renderMainContent()}
+      </main>
+    </div>
+  );
+};
+
+const Dashboard = () => {
   return (
     <ThemeProvider>
-      <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <Sidebar 
-          currentView={currentView} 
-          setCurrentView={setCurrentView}
-          onLogout={logout}
-        />
-        <Header 
-          onLogout={logout}
-          onMenuToggle={handleMenuToggle}
-          userInfo={{ name: "Alex Johnson", email: "alex@example.com" }}
-        />
-        <main className="main-content">
-          {renderMainContent()}
-        </main>
-      </div>
+      <NavigationProvider>
+        <DashboardContent />
+      </NavigationProvider>
     </ThemeProvider>
   );
 };
