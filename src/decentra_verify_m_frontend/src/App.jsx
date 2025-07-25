@@ -298,7 +298,7 @@ const AppContent = () => {
             <div className="login-card">
               <div className="logo">
                 <div className="logo-icon">📋</div>
-                <h1>CredVerify</h1>
+                <h1>TrueYou</h1>
               </div>
               <p>Secure credential verification on the Internet Computer</p>
               <button onClick={login} className="login-btn">
