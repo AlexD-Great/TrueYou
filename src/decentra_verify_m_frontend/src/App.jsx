@@ -205,6 +205,10 @@ const AppContent = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
+  const handleSidebarClose = () => {
+    setSidebarOpen(false);
+  };
+
   const renderMainContent = () => {
     console.log("🔄 renderMainContent called with currentView:", currentView);
     switch (currentView) {
@@ -315,8 +319,11 @@ const AppContent = () => {
   return (
     <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
       <AuthProvider>
+        {sidebarOpen && <div className="sidebar-backdrop" onClick={handleSidebarClose} />}
         <Sidebar 
           onLogout={logout}
+          isOpen={sidebarOpen}
+          onClose={handleSidebarClose}
         />
         <Header 
           onLogout={logout}
