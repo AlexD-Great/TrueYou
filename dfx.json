@@ -2,13 +2,15 @@
   "canisters": {
     "decentra_verify_m_backend": {
       "main": "src/decentra_verify_m_backend/main.mo",
-      "type": "motoko"
+      "type": "motoko",
+      "specified_id": "womyo-6iaaa-aaaad-qhoaq-cai"
     },
     "decentra_verify_m_frontend": {
       "dependencies": ["decentra_verify_m_backend"],
       "source": ["src/decentra_verify_m_frontend/dist"],
       "type": "assets",
-      "workspace": "decentra_verify_m_frontend"
+      "workspace": "decentra_verify_m_frontend",
+      "specified_id": "whpts-iaaaa-aaaad-qhoba-cai"
     },
     "internet_identity": {
       "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
