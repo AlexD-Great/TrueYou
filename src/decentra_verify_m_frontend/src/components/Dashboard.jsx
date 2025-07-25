@@ -119,7 +119,7 @@ const Dashboard = () => {
             <div className="debug-info">
               <small style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>
                 Principal ID: {userPrincipal.slice(0, 12)}...{userPrincipal.slice(-8)}
-                {(userPrincipal === "10000" || userPrincipal === "k2ir2-52b5o-sc6f7-ai4bg-vdrf3-wghtz-xz4us-77lr6-y6cfv-5qlvy-sqe") && (
+                {(userPrincipal === "10000" || userPrincipal === "ues2k-6iwxj-nbezb-owlhg-nsem4-abqjc-74ocv-lsxps-ytjv4-2tphv-yqe") && (
                   <span style={{ color: 'var(--success-color)', fontWeight: '600' }}> (Super Admin)</span>
                 )}
               </small>

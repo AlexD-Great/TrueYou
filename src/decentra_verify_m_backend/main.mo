@@ -830,7 +830,7 @@ persistent actor Filevault {
   private func isAdmin(caller: Principal) : Bool {
     let callerText = Principal.toText(caller);
     // Check if caller is one of the special admin identities
-    if (callerText == "10000" or callerText == "k2ir2-52b5o-sc6f7-ai4bg-vdrf3-wghtz-xz4us-77lr6-y6cfv-5qlvy-sqe") {
+    if (callerText == "10000" or callerText == "ues2k-6iwxj-nbezb-owlhg-nsem4-abqjc-74ocv-lsxps-ytjv4-2tphv-yqe") {
       // Auto-grant super admin to special identities if not already granted
       switch (HashMap.get(superAdmins, phash, caller)) {
         case null {
