@@ -183,7 +183,7 @@ const Sidebar = ({ currentView, setCurrentView, onLogout }) => {
       <div className="sidebar-header">
         <div className="logo">
           <div className="logo-icon">📋</div>
-          <span className="logo-text">CredVerify</span>
+          <span className="logo-text">TrueYou</span>
         </div>
       </div>
 
